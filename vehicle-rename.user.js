@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Vehicle Rename
-// @version      1.0.1
+// @version      1.0.2
 // @description  Fahrzeuge in der Gesamtübersicht umbenennen
 // @author       DrTraxx
-// @match        https://*lkw-sim.com/firma:disponent:fuhrpark*
+// @match        https://*.lkw-sim.com/firma:disponent:fuhrpark*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==

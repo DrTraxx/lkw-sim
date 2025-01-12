@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Input-Control
-// @version      1.0.1
+// @version      1.0.2
 // @description  Fahrer und Zugmaschinen mit Anhänger auswählen
 // @author       DrTraxx
-// @match        https://*lkw-sim.com/firma:disponent:auftrag2*
-// @match        https://*lkw-sim.com/firma:disponent:auftragsbestaetigung?method=methode-2
+// @match        https://*.lkw-sim.com/firma:disponent:auftrag2*
+// @match        https://*.lkw-sim.com/firma:disponent:auftragsbestaetigung?method=methode-2
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==

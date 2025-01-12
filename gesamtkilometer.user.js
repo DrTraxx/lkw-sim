@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Gesamtkilometer
-// @version      1.0.1
+// @version      1.0.2
 // @description  Gefahrene Kilometer aktueller Monat
 // @author       DrTraxx
-// @match        https://*lkw-sim.com/firma:eigenes-buero:firmeninfo
+// @match        https://*.lkw-sim.com/firma:eigenes-buero:firmeninfo
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==
