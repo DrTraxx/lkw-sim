@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Input-Control
-// @version      1.0.2
+// @version      1.0.3
 // @description  Fahrer und Zugmaschinen mit Anhänger auswählen
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:auftrag2*
@@ -17,7 +17,7 @@
 
     let driverID = "";
 
-    $("input[type='number']").each((k, i) => {
+    $("input[type='number']:not(#modal_low):not(#modal_hig)").each((k, i) => {
         const iptDesc = i.nextSibling.textContent.trim();
 
         let iptType = "";
