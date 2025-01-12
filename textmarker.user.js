@@ -1,8 +1,7 @@
 // ==UserScript==
 // @name         Textmarker
-// @namespace    http://tampermonkey.net/
-// @version      1.1.2
-// @description  Marks Elements with 15km and above
+// @version      2.0.0
+// @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:fax-auftraege*
 // @match        https://*.lkw-sim.com/firma:disponent:auftrag*
@@ -14,20 +13,64 @@
 (function () {
     'use strict';
 
-    /*
-    Hier in dem Array die Orte eintragen, an denen die Fahrzeuge bleiben sollen. Bitte ans Schema halten.
-    */
-    const places = [
-        "Hamm", "Recklinghausen", "Düsseldorf", "Köln", "Duisburg", "Essen", "Gelsenkirchen", "Hagen", "Herne", "Mönchengladbach",
-        "Siegen", "Leverkusen", "Aachen", "Bottrop", "Bochum", "Wuppertal", "Osnabrück", "Münster", "Mülheim an der Ruhr", "Bonn",
-        "Neuss", "Paderborn", "Kassel", "Oberhausen", "Krefeld", "Bergisch Gladbach", "Moers", "Bielefeld", "Osnabrück", "Koblenz",
-        "Offenbach am Main", "Erfurt", "Wolfsburg", "Hannover", "Frankfurt am Main", "Braunschweig", "Göttingen", "Salzgitter", "Hildesheim"
-    ];
-    /*
-    Die beiden Zahlen hier geben die Entfernungen für die farbliche Markierung an. Zahlen bitte als Zahlen schreiben, ohne Anführungszeichen.
-    */
-    const disLow = 50,
-        disHig = 200;
+    const places = localStorage.placedata ? JSON.parse(localStorage.placedata) : [],
+        disLow = +localStorage?.disLow || 50,
+        disHig = +localStorage?.disHig || 200;
+
+    $(".navbar-inner.blue > div:first > div.nav-collapse > .nav")
+        .append(`<li class="dropdown">
+  					<a class="dropdown-toggle" style="cursor:pointer;" id="modal_toggle">Liefereinstellungen</a>
+  				</li>`);
+
+    $("body")
+        .append(`<div class="modal" tabindex="-1" role="dialog" id="modal_places" style="display:none;">
+                   <div class="modal-dialog" role="document">
+                     <div class="modal-content">
+                       <div class="modal-header">
+                         <h5 class="modal-title">Einstellungen</h5>
+                       </div>
+                       <div class="modal-body">
+                         <strong>Lieferorte, an denen die LKW nicht zurückfahren sollen</strong>
+                         <p>Bitte die Orte korrekt schreiben und mit einem Komma voneinander trennen!<br>
+                         Bleibt das Textfeld leer, werden die Rückfahreinstellungen nicht geändert.</p>
+                         <textarea id="modal_stay" style="height:140px;width:520px">${ places.join(", ") }</textarea>
+                         <br>
+                         <!--<div class="span4">-->
+                           Fahrtstrecke grün bis (km)
+                           <input id="modal_low" type="number" min="15" max="${ disHig - 1 }" value="${ disLow }" style="width:75px;">
+                         <!--</div>
+                         <div class="span4">-->
+                         <br>
+                           Fahrtstrecke rot ab (km)
+                           <input id="modal_hig" type="number" min="${ disLow + 1 }" value="${ disHig }" style="width:75px;">
+                         <!--</div>-->
+                       </div>
+                       <div class="modal-footer">
+                         <button type="button" class="btn btn-primary" id="modal_save">Speichern</button>
+                         <button type="button" class="btn btn-secondary" id="modal_dismiss">Abbrechen</button>
+                       </div>
+                     </div>
+                   </div>
+                 </div>`);
+
+    async function saveSettings () {
+        const newPlaces = $("#modal_stay").val().trim() ? $("#modal_stay").val().split(",").map(a => a.trim()).sort((a, b) => a > b ? 1 : -1) : [],
+            newLow = +$("#modal_low").val(),
+            newHig = +$("#modal_hig").val();
+
+        localStorage.placedata = JSON.stringify(newPlaces);
+        localStorage.disLow = JSON.stringify(newLow);
+        localStorage.disHig = JSON.stringify(newHig);
+
+        await alert("Erfolgreich gespeichert!");
+
+        window.location.reload();
+    }
+
+    $("body")
+        .on("click", "#modal_toggle", e => $("#modal_places").css("display", "block"))
+        .on("click", "#modal_dismiss", e => $("#modal_places").css("display", "none"))
+        .on("click", "#modal_save", e => saveSettings());
 
     let deliver = null;
 
@@ -47,7 +90,7 @@
         });
     }
 
-    if (!places.includes(deliver)) {
+    if (places.length > 0 && !places.includes(deliver)) {
         $("select").val("2");
     }
 
