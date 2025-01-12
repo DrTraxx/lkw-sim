@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Input-Control
-// @version      1.0.0
-// @description  Fahrer und Zugmaschinen mit Anhänger auswählen
+// @name         Textmarker
+// @namespace    http://tampermonkey.net/
+// @version      1.1.0
+// @description  Marks Elements with 15km and above
 // @author       DrTraxx
-// @match        https://www.lkw-sim.com/firma:disponent:auftrag2*
-// @match        https://www.lkw-sim.com/firma:disponent:auftragsbestaetigung?method=methode-2
+// @match        https://www.lkw-sim.com/firma:disponent:fax-auftraege*
+// @match        https://www.lkw-sim.com/firma:disponent:auftrag*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==
@@ -13,76 +14,58 @@
 (function () {
     'use strict';
 
-    const iptTypes = {};
+    /*
+    Hier in dem Array die Orte eintragen, an denen die Fahrzeuge bleiben sollen. Bitte ans Schema halten.
+    */
+    const places = [
+        "Hamm", "Recklinghausen", "Düsseldorf", "Köln", "Duisburg", "Essen", "Gelsenkirchen", "Hagen", "Herne", "Mönchengladbach",
+        "Siegen", "Leverkusen", "Aachen", "Bottrop", "Bochum", "Wuppertal", "Osnabrück", "Münster", "Mülheim an der Ruhr", "Bonn",
+        "Neuss", "Paderborn", "Kassel", "Oberhausen", "Krefeld", "Bergisch Gladbach", "Moers", "Bielefeld", "Osnabrück", "Koblenz",
+        "Offenbach am Main", "Erfurt", "Wolfsburg", "Hannover", "Frankfurt am Main", "Braunschweig", "Göttingen", "Salzgitter", "Hildesheim"
+    ];
+    /*
+    Die beiden Zahlen hier geben die Entfernungen für die farbliche Markierung an. Zahlen bitte als Zahlen schreiben, ohne Anführungszeichen.
+    */
+    const disLow = 50,
+        disHig = 200;
 
-    let driverID = "";
+    let deliver = null;
 
-    $("input[type='number']").each((k, i) => {
-        const iptDesc = i.nextSibling.textContent.trim();
+    if (window.location.pathname === "/firma:disponent:fax-auftraege") {
+        const way = $("strong:contains('Strecke:')")?.[0]?.nextSibling?.textContent,
+            regExp = /(?:\W\—\W)(?<target>.+)(?:\(\d+\Wkm\))/gm,
+            matchedLocation = regExp.exec(way);
 
-        let iptType = "";
+        deliver = matchedLocation.groups.target.trim();
 
-        if (i.id.includes("d")) {
-            iptType = "driver";
-            driverID = i.id;
-        } else if (i.id.includes("c")) {
-            iptType = "lkw";
-            if (iptDesc.includes("Gigaliner")) $(i).attr("watched_by_script", "true");
-        } else if (i.id.includes("t")) {
-            iptType = "trailer";
-            $(i).attr("watched_by_script", "true");
-        }
+        $("span[style='color:red']").parent().parent().parent().css("display", "none");
+    } else if (window.location.pathname.includes("firma:disponent:auftrag")) {
+        deliver = $("strong:contains('Lieferort')")?.[0]?.nextSibling?.textContent?.trim();
 
-        iptTypes[i.id] = {
-            text: iptDesc,
-            type: iptType,
-            id: i.id
-        }
-    });
-
-    function checkDriver () {
-        let sumDrivers = 0;
-        for (const i in iptTypes) {
-            const { text, type, id } = iptTypes[i];
-            if (type === "lkw") {
-                sumDrivers += +$(`#${ id }`).val();
-            }
-        }
-        $(`#${ driverID }`).val(sumDrivers).trigger("change");
+        $("td:contains(0 FE)").each((k, i) => {
+            if (i.textContent === "0 FE") $(i).parent().css("display", "none");
+        });
     }
 
-    // $("input[type='number']:not(input[watched_by_script='true'])").attr("disabled", "disabled");
-    $("input[type='number']:not(input[watched_by_script='true'])").css("-moz-appearance", "textfield");
-    $(".add, .delete").css("display", "none");
+    if (!places.includes(deliver)) {
+        $("select").val("2");
+    }
 
-    $(document).on("change", "input[watched_by_script='true']", e => {
-        if (e.isTrigger) return;
+    $(`td:contains(' km')`).each((k, i) => {
+        const distance = +i.innerText.replace(/\D+/g, "");
 
-        const target = e.target,
-            { id, value } = target,
-            iptType = iptTypes[id];
+        let colVal = "";
 
-        if (iptType.type === "trailer") {
-            for (const i in iptTypes) {
-                if (iptType.text.includes("auflieger") && iptTypes[i].text.includes("Sattelzugmaschine")) $(`#${ i }`).val(value).trigger("change");
-                if (iptType.text.includes("Anhänger") && iptTypes[i].text.includes("Lkw")) $(`#${ i }`).val(value).trigger("change");
-                if (iptType.text === "Kleintransporteranhänger" && iptTypes[i].text === "Kleintransporter") $(`#${ i }`).val(value).trigger("change");
-            }
-            checkDriver();
-        }
-        if (iptType.type === "lkw" && iptType.text.includes("Gigaliner")) {
-            checkDriver();
-        }
-    });
-
-    $(document).on("keypress", e => {
-        const { key, target } = e;
-
-        if (target.nodeName !== "BODY") {
-            return;
+        if (distance <= disLow) {
+            colVal = "limegreen";
+        } else if (distance > disLow && distance <= disHig) {
+            colVal = "orange"
+        } else {
+            colVal = "#F62817";
         }
 
-        if (key === "e") $("input.btn").click();
+        $(i).css("background-color", colVal);
+        $(i).parent().children().last().css("background-color", colVal);
     });
 
 })();
