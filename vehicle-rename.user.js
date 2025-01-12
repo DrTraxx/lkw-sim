@@ -1,10 +1,9 @@
 // ==UserScript==
 // @name         Vehicle Rename
-// @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Fahrzeuge in der Gesamtübersicht umbenennen
 // @author       DrTraxx
-// @match        https://www.lkw-sim.com/firma:disponent:fuhrpark*
+// @match        https://*lkw-sim.com/firma:disponent:fuhrpark*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==

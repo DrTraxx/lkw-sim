@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Textmarker
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Marks Elements with 15km and above
 // @author       DrTraxx
-// @match        https://www.lkw-sim.com/firma:disponent:fax-auftraege*
-// @match        https://www.lkw-sim.com/firma:disponent:auftrag*
+// @match        https://*lkw-sim.com/firma:disponent:fax-auftraege*
+// @match        https://*lkw-sim.com/firma:disponent:auftrag*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==
