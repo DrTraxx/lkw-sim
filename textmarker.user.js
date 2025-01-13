@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.1.0
+// @version      2.2.0
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:fax-auftraege*
@@ -18,7 +18,13 @@
 
   const places = localStorage.placedata ? JSON.parse(localStorage.placedata) : [],
     disLow = +localStorage?.disLow || 50,
-    disHig = +localStorage?.disHig || 200;
+    disHig = +localStorage?.disHig || 200,
+    colors = { lime: "limegreen", orange: "orange", red: "#F62817" },
+    date = new Date(),
+    dayDigit = date.getDate() < 10 ? "0" + date.getDate() : date.getDate(),
+    todayDate = `${ dayDigit }.${ date.getMonth() + 1 }.${ date.getFullYear() }`,
+    oneDay = 1 * 24 * 60 * 60 * 1000,
+    twoDays = 2 * 24 * 60 * 60 * 1000;
 
   $(".navbar-inner.blue > div:first > div.nav-collapse > .nav")
     .append(`<li class="dropdown">
@@ -102,11 +108,11 @@
       let colVal = "";
 
       if (distance <= disLow) {
-        colVal = "limegreen";
+        colVal = colors.lime;
       } else if (distance > disLow && distance <= disHig) {
-        colVal = "orange"
+        colVal = colors.orange
       } else {
-        colVal = "#F62817";
+        colVal = colors.red;
       }
 
       $(i).css("background-color", colVal);
@@ -116,13 +122,33 @@
 
   function markTarget () {
     $(`td:contains(' km')`).each((k, i) => {
-      const deliver = i.innerText.split("(")[0].trim();
+      const deliver = i.innerText.split("(")[0].trim(),
+        delDateElem = $(i).next().next(),
+        splittedDate = delDateElem.text().split(","),
+        delDate = splittedDate[0],
+        delTime = splittedDate[1].trim(),
+        delDateSplitted = delDate.split("."),
+        delTimeSplitted = delTime.split(":"),
+        delDateConst = new Date(+delDateSplitted[2], +delDateSplitted[1] - 1, +delDateSplitted[0], +delTimeSplitted[0], +delTimeSplitted[1]);
+
+      // weniger als 24 Stunden
+      if (delDateConst.getTime() - date.getTime() < oneDay) {
+        delDateElem.css("background-color", colors.red);
+      }
+      // mehr als 24, weniger als 48 Stunden
+      else if (delDateConst.getTime() - date.getTime() >= oneDay && delDateConst.getTime() - date.getTime() < twoDays) {
+        delDateElem.css("background-color", colors.orange);
+      }
+      // mehr als 48 Stunden
+      else if (delDateConst.getTime() - date.getTime() >= twoDays) {
+        delDateElem.css("background-color", colors.lime);
+      }
 
       if (places.includes(deliver)) {
-        $(i).css("background-color", "limegreen");
+        $(i).css("background-color", colors.lime);
         $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/adr.png" width="16" height="16" title="Bei Lieferung an diesem Ort zurückfahren" class="place-remove" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
       } else {
-        $(i).css("background-color", "orange");
+        $(i).css("background-color", colors.orange);
         $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/tag_red.png" width="16" height="16" title="Bei Lieferung an diesem Ort stehenbleiben" class="place-add" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
       }
     });
