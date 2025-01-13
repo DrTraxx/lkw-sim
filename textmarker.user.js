@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.2.0
+// @version      2.2.1
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:fax-auftraege*
@@ -158,7 +158,7 @@
 
   if (window.location.pathname === "/firma:disponent:fax-auftraege") {
     const way = $("strong:contains('Strecke:')")?.[0]?.nextSibling?.textContent,
-      regExp = /(?:\W\—\W)(?<target>.+)(?:\(\d+\Wkm\))/gm,
+      regExp = /(?:\W\—\W)(?<target>.+)(?:\([\d\W]+km\))/gm,
       matchedLocation = regExp.exec(way);
 
     deliver = matchedLocation.groups.target.trim();
