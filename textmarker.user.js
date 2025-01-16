@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.2.1
+// @version      2.3.0
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:fax-auftraege*
@@ -154,6 +154,17 @@
     });
   }
 
+  function toggleLateVehicles ($e) {
+    if ($e.hasClass("btn-danger")) {
+      $("span[style='color:red']").parent().parent().parent().css("display", "");
+      $e.text("Verspätungen ausblenden");
+    } else {
+      $("span[style='color:red']").parent().parent().parent().css("display", "none");
+      $e.text("Verspätungen einblenden");
+    }
+    $e.toggleClass("btn-danger btn-success");
+  }
+
   let deliver = null;
 
   if (window.location.pathname === "/firma:disponent:fax-auftraege") {
@@ -166,6 +177,9 @@
     markDistance(deliver);
 
     $("span[style='color:red']").parent().parent().parent().css("display", "none");
+
+    $("h2:contains(Anschlussaufträge)")
+      .after(`<a class="btn btn-danger" id="toggle_lates">Verspätungen einblenden</>`);
   } else if (window.location.pathname.includes("firma:disponent:auftrag")) {
     deliver = $("strong:contains('Lieferort')")?.[0]?.nextSibling?.textContent?.trim();
 
@@ -185,6 +199,7 @@
     .on("click", "#modal_dismiss", e => $("#modal_places").css("display", "none"))
     .on("click", "#modal_save", e => saveSettings())
     .on("click", ".place-add", e => addLocation(e.currentTarget.attributes.location.value))
-    .on("click", ".place-remove", e => removeLocation(e.currentTarget.attributes.location.value));
+    .on("click", ".place-remove", e => removeLocation(e.currentTarget.attributes.location.value))
+    .on("click", "#toggle_lates", e => toggleLateVehicles($(e.currentTarget)));
 
 })();
