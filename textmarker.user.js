@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.4.1
+// @version      2.4.2
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        *://www.lkw-sim.com/firma:disponent*
@@ -120,6 +120,20 @@
     window.location.reload();
   }
 
+  function createLkwButton () {
+    faxVehicles.sort((a, b) => a.distance > b.distance ? 1 : -1);
+
+    for (const vehicle of faxVehicles) {
+      const { delay, distance, capacity } = vehicle;
+
+      if (delay && !lateVehicles) continue;
+
+      if ($(`.add-lkw[capacity=${ capacity }]`).length === 0) {
+        $("#fax_btn_grp").append(`<a class="btn btn-success add-lkw" capacity="${ capacity }">+ ${ capacity } FE - ${ distance.toLocaleString() } km</a>`);
+      }
+    }
+  }
+
   function markDistance (deliver, fax = false) {
     if (places.length > 0 && !places.includes(deliver)) {
       $("select").val("2");
@@ -158,19 +172,11 @@
     });
 
     if (fax) {
-      faxVehicles.sort((a, b) => a.distance > b.distance ? 1 : -1);
+      createLkwButton();
 
-      for (const vehicle of faxVehicles) {
-        const { delay, distance, capacity } = vehicle;
-
-        if (delay) continue;
-
-        if ($(`.add-lkw[capacity=${ capacity }]`).length === 0) {
-          $("#fax_btn_grp").append(`<a class="btn btn-success add-lkw" capacity="${ capacity }">+ ${ capacity } FE - ${ distance.toLocaleString() } km</a>`);
-        }
-      }
-
-      $("#fax_btn_grp").after(`<div class="alert alert-danger" style="margin-top:2em;"><strong>Verfügbare Frachteinheiten</strong><br><strong>Pünktlich:</strong> ${ onTimeFe.toLocaleString() } FE<br><strong>Verspätet:</strong> ${ delayedFe.toLocaleString() } FE<br><strong>Gesamt:</strong> ${ (onTimeFe + delayedFe).toLocaleString() } FE`);
+      $("#fax_btn_grp")
+        .after(`<div class="alert alert-danger" style="margin-top:2em;">
+                          <strong>Verfügbare Frachteinheiten</strong><br><strong>Pünktlich:</strong> ${ onTimeFe.toLocaleString() } FE<br><strong>Verspätet:</strong> ${ delayedFe.toLocaleString() } FE<br><strong>Gesamt:</strong> ${ (onTimeFe + delayedFe).toLocaleString() } FE</div>`);
     }
   }
 
@@ -228,15 +234,16 @@
   }
 
   function toggleLateVehicles ($e) {
+    lateVehicles = !lateVehicles;
     if ($e.hasClass("btn-danger")) {
       $("span[style='color:red']").parent().parent().parent().css("display", "");
       $e.text("Verspätungen ausblenden");
+      createLkwButton();
     } else {
       $("span[style='color:red']").parent().parent().parent().css("display", "none");
       $e.text("Verspätungen einblenden");
     }
     $e.toggleClass("btn-danger btn-success");
-    lateVehicles = !lateVehicles;
   }
 
 
