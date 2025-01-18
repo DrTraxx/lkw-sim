@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.4.0
+// @version      2.4.1
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        *://www.lkw-sim.com/firma:disponent*
@@ -51,10 +51,9 @@
     faxVehicles = [];
 
 
-  let lateVehicles = false;
-
-  console.debug(path);
-  console.info(settings);
+  let lateVehicles = false,
+    onTimeFe = 0,
+    delayedFe = 0;
 
   $(".navbar-inner.blue > div:first > div.nav-collapse > .nav")
     .append(`<li class="dropdown">
@@ -136,6 +135,12 @@
           capacity: +i.parentElement.children[2].textContent.replace(/\D+/g, ""),
           toggleElement: $(i.parentElement.children[7].children[0])
         });
+
+        if (i.parentElement.children[6].children[0].children[1].style.color === "red") {
+          delayedFe += +i.parentElement.children[2].textContent.replace(/\D+/g, "");
+        } else {
+          onTimeFe += +i.parentElement.children[2].textContent.replace(/\D+/g, "");
+        }
       }
 
       let colVal = "";
@@ -164,6 +169,8 @@
           $("#fax_btn_grp").append(`<a class="btn btn-success add-lkw" capacity="${ capacity }">+ ${ capacity } FE - ${ distance.toLocaleString() } km</a>`);
         }
       }
+
+      $("#fax_btn_grp").after(`<div class="alert alert-danger" style="margin-top:2em;"><strong>Verfügbare Frachteinheiten</strong><br><strong>Pünktlich:</strong> ${ onTimeFe.toLocaleString() } FE<br><strong>Verspätet:</strong> ${ delayedFe.toLocaleString() } FE<br><strong>Gesamt:</strong> ${ (onTimeFe + delayedFe).toLocaleString() } FE`);
     }
   }
 
