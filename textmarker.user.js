@@ -1,30 +1,60 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.3.0
+// @version      2.4.0
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
-// @match        https://*.lkw-sim.com/firma:disponent:fax-auftraege*
-// @match        https://*.lkw-sim.com/firma:disponent:auftrag*
-// @match        https://*.lkw-sim.com/firma:disponent?start=*
-// @match        https://*.lkw-sim.com/firma:disponent
-// @match        https://*.lkw-sim.com/firma:disponent:vertragsuebersicht
+// @match        *://www.lkw-sim.com/firma:disponent*
+// @match        *://lkw-sim.com/firma:disponent*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
-// @grant        none
+// @grant        GM_addStyle
 // ==/UserScript==
 /* global $ */
 
 (function () {
   'use strict';
 
-  const places = localStorage.placedata ? JSON.parse(localStorage.placedata) : [],
-    disLow = +localStorage?.disLow || 50,
-    disHig = +localStorage?.disHig || 200,
+  GM_addStyle(`
+        .modal {
+            display: none;
+            position: fixed; /* Stay in place front is invalid - may break your css so removed */
+            top: 10em;
+            width: 600px;
+            overflow: auto;
+            background-color: whitesmoke;
+            z-index: 9999;
+        }
+        .modal-body{
+            overflow-y: auto;
+        }`);
+
+  if (localStorage.placedata || localStorage.disLow || localStorage.disHig) {
+    localStorage.textmarker = JSON.stringify({
+      places: localStorage.placedata ? JSON.parse(localStorage.placedata) : [],
+      disLow: +localStorage?.disLow || 50,
+      disHig: +localStorage?.disHig || 200,
+    });
+
+    localStorage.removeItem("placedata");
+    localStorage.removeItem("disLow");
+    localStorage.removeItem("disHig");
+  }
+
+  const settings = localStorage.textmarker ? JSON.parse(localStorage.textmarker) : { places: [], disLow: 50, disHig: 200 },
+    { places, disLow, disHig } = settings,
+    path = window.location.pathname,
     colors = { lime: "limegreen", orange: "orange", red: "#F62817" },
     date = new Date(),
     dayDigit = date.getDate() < 10 ? "0" + date.getDate() : date.getDate(),
     todayDate = `${ dayDigit }.${ date.getMonth() + 1 }.${ date.getFullYear() }`,
     oneDay = 1 * 24 * 60 * 60 * 1000,
-    twoDays = 2 * 24 * 60 * 60 * 1000;
+    twoDays = 2 * 24 * 60 * 60 * 1000,
+    faxVehicles = [];
+
+
+  let lateVehicles = false;
+
+  console.debug(path);
+  console.info(settings);
 
   $(".navbar-inner.blue > div:first > div.nav-collapse > .nav")
     .append(`<li class="dropdown">
@@ -32,11 +62,11 @@
   				</li>`);
 
   $("body")
-    .append(`<div class="modal" tabindex="-1" role="dialog" id="modal_places" style="display:none;">
+    .append(`<div class="modal" tabindex="-1" role="dialog" id="modal_places">
                    <div class="modal-dialog" role="document">
                      <div class="modal-content">
                        <div class="modal-header">
-                         <h5 class="modal-title">Einstellungen</h5>
+                         <h3 class="modal-title">Einstellungen</h3>
                        </div>
                        <div class="modal-body">
                          <strong>Lieferorte, an denen die LKW nicht zurückfahren sollen</strong>
@@ -67,43 +97,46 @@
       newLow = +$("#modal_low").val(),
       newHig = +$("#modal_hig").val();
 
-    localStorage.placedata = JSON.stringify(newPlaces);
-    localStorage.disLow = JSON.stringify(newLow);
-    localStorage.disHig = JSON.stringify(newHig);
+    localStorage.textmarker = JSON.stringify({
+      places: newPlaces,
+      disLow: newLow,
+      disHig: newHig
+    });
 
     await alert("Erfolgreich gespeichert!");
 
     window.location.reload();
   }
 
-  async function addLocation (location) {
-    places.push(location);
-    places.sort((a, b) => a > b ? 1 : -1);
+  async function toggleLocation (location, add) {
+    if (add) places.push(location);
 
-    localStorage.placedata = JSON.stringify(places);
-
-    await alert("Ort hinzugefügt.");
-
-    window.location.reload();
-  }
-
-  async function removeLocation (location) {
-    const newPlaces = places.filter(a => a !== location);
+    const newPlaces = add ? places : places.filter(a => a !== location);
+    newPlaces.sort((a, b) => a > b ? 1 : -1);
 
     localStorage.placedata = JSON.stringify(newPlaces);
 
-    await alert("Ort entfernt.");
+    await alert(`Ort  ${ add ? "hinzugefügt" : "entfernt" }`);
 
     window.location.reload();
   }
 
-  function markDistance (deliver) {
+  function markDistance (deliver, fax = false) {
     if (places.length > 0 && !places.includes(deliver)) {
       $("select").val("2");
     }
 
     $(`td:contains(' km')`).each((k, i) => {
       const distance = +i.innerText.replace(/\D+/g, "");
+
+      if (fax) {
+        faxVehicles.push({
+          delay: i.parentElement.children[6].children[0].children[1].style.color === "red",
+          distance: distance,
+          capacity: +i.parentElement.children[2].textContent.replace(/\D+/g, ""),
+          toggleElement: $(i.parentElement.children[7].children[0])
+        });
+      }
 
       let colVal = "";
 
@@ -118,6 +151,39 @@
       $(i).css("background-color", colVal);
       $(i).parent().children().last().css("background-color", colVal);
     });
+
+    if (fax) {
+      faxVehicles.sort((a, b) => a.distance > b.distance ? 1 : -1);
+
+      for (const vehicle of faxVehicles) {
+        const { delay, distance, capacity } = vehicle;
+
+        if (delay) continue;
+
+        if ($(`.add-lkw[capacity=${ capacity }]`).length === 0) {
+          $("#fax_btn_grp").append(`<a class="btn btn-success add-lkw" capacity="${ capacity }">+ ${ capacity } FE - ${ distance.toLocaleString() } km</a>`);
+        }
+      }
+    }
+  }
+
+  function addFaxLkw (capacity) {
+    const vehicle = lateVehicles ? faxVehicles.find(i => i.capacity === capacity) : faxVehicles.filter(i => i.delay === false).find(i => i.capacity === capacity),
+      idx = faxVehicles.findIndex(e => e === vehicle);
+
+    if (idx === -1) {
+      alert("Kein passender LKW vorhanden!");
+      $(`.add-lkw[capacity=${ capacity }]`).text(`+ ${ capacity } FE - kein Fahrzeug`);
+      return;
+    }
+
+    vehicle.toggleElement.click();
+    faxVehicles.splice(idx, 1);
+
+    const newNearestVehicle = lateVehicles ? faxVehicles.find(i => i.capacity === capacity) : faxVehicles.filter(i => i.delay === false).find(i => i.capacity === capacity),
+      btnTxt = newNearestVehicle ? `+ ${ capacity } FE - ${ newNearestVehicle?.distance?.toLocaleString() } km` : `+ ${ capacity } FE - kein Fahrzeug`;
+
+    $(`.add-lkw[capacity=${ capacity }]`).text(btnTxt);
   }
 
   function markTarget () {
@@ -163,24 +229,27 @@
       $e.text("Verspätungen einblenden");
     }
     $e.toggleClass("btn-danger btn-success");
+    lateVehicles = !lateVehicles;
   }
+
 
   let deliver = null;
 
-  if (window.location.pathname === "/firma:disponent:fax-auftraege") {
-    const way = $("strong:contains('Strecke:')")?.[0]?.nextSibling?.textContent,
-      regExp = /(?:\W\—\W)(?<target>.+)(?:\([\d\W]+km\))/gm,
-      matchedLocation = regExp.exec(way);
-
-    deliver = matchedLocation.groups.target.trim();
-
-    markDistance(deliver);
-
+  if (path === "/firma:disponent:fax-auftraege") {
     $("span[style='color:red']").parent().parent().parent().css("display", "none");
 
     $("h2:contains(Anschlussaufträge)")
-      .after(`<a class="btn btn-danger" id="toggle_lates">Verspätungen einblenden</>`);
-  } else if (window.location.pathname.includes("firma:disponent:auftrag")) {
+      .after(`<div class="btn-group" id="fax_btn_grp"><a class="btn btn-danger" id="toggle_lates">Verspätungen einblenden</></div>`);
+
+    const way = $("strong:contains('Strecke:')")?.[0]?.nextSibling?.textContent,
+      regExp = /(?<start>[\w\W]+)\W\—\W(?<destination>.+)\((?<distance>[\d\w\s]+)\)/g,
+      matchedExp = regExp.exec(way);
+
+    deliver = matchedExp.groups.destination.trim();
+
+    markDistance(deliver, true);
+
+  } else if (path === "/firma:disponent:auftrag" || path === "/firma:disponent:auftrag2" || path === "/firma:disponent:auftrag3") {
     deliver = $("strong:contains('Lieferort')")?.[0]?.nextSibling?.textContent?.trim();
 
     markDistance(deliver);
@@ -188,18 +257,17 @@
     $("td:contains(0 FE)").each((k, i) => {
       if (i.textContent === "0 FE") $(i).parent().css("display", "none");
     });
-  } else if (window.location.pathname === "/firma:disponent") {
-    markTarget();
-  } else if (window.location.pathname.includes("firma:disponent:vertragsuebersicht")) {
+  } else if (path === "/firma:disponent" || path === "/firma:disponent:vertragsuebersicht") {
     markTarget();
   }
 
   $("body")
-    .on("click", "#modal_toggle", e => $("#modal_places").css("display", "block"))
+    .on("click", "#modal_toggle", e => $("#modal_places").css("display", "inline-block"))
     .on("click", "#modal_dismiss", e => $("#modal_places").css("display", "none"))
     .on("click", "#modal_save", e => saveSettings())
-    .on("click", ".place-add", e => addLocation(e.currentTarget.attributes.location.value))
-    .on("click", ".place-remove", e => removeLocation(e.currentTarget.attributes.location.value))
-    .on("click", "#toggle_lates", e => toggleLateVehicles($(e.currentTarget)));
+    .on("click", ".place-add", e => toggleLocation(e.currentTarget.attributes.location.value, true))
+    .on("click", ".place-remove", e => toggleLocation(e.currentTarget.attributes.location.value, false))
+    .on("click", "#toggle_lates", e => toggleLateVehicles($(e.currentTarget)))
+    .on("click", ".add-lkw", e => addFaxLkw(+e.currentTarget.attributes.capacity.value));
 
 })();
