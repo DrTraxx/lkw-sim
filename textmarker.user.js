@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.4.3
+// @version      2.5.0
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        *://www.lkw-sim.com/firma:disponent*
@@ -44,7 +44,7 @@
         localStorage.removeItem("disHig");
     }
 
-    const settings = localStorage.textmarker ? JSON.parse(localStorage.textmarker) : { places: [], disLow: 50, disHig: 200 },
+    const settings = localStorage.textmarker ? JSON.parse(localStorage.textmarker) : { places: [], disLow: 50, disHig: 200, use_distance: false, distance: 500 },
         { places, disLow, disHig } = settings,
         path = window.location.pathname,
         colors = { lime: "limegreen", orange: "orange", red: "#F62817" },
@@ -83,16 +83,19 @@
                          <p>Bitte die Orte korrekt schreiben und mit einem Komma voneinander trennen!<br>
                          Bleibt das Textfeld leer, werden die Rückfahreinstellungen nicht geändert.</p>
                          <textarea id="modal_stay" style="height:140px;width:520px">${ places.join(", ") }</textarea>
+                         <hr>
+                         <div class="form-check" style="display:flex;">
+                           <input type="checkbox" class="form-check-input" id="modal_use_distance" ${ settings.use_distance ? 'checked="checked"' : '' }>
+                           <label class="form-check-label" for="modal_use_distance" style="margin-left:1em;">Rückfahrten nach Entfernung</label>
+                         </div>
+                         Zurückfahren ab (km)
+                         <input id="modal_distance" type="number" min="0" value="${ settings.distance }" style="width:75px;">
+                         <hr>
+                         Fahrtstrecke grün bis (km)
+                         <input id="modal_low" type="number" min="15" max="${ disHig - 1 }" value="${ disLow }" style="width:75px;background-color:${ colors.lime }">
                          <br>
-                         <!--<div class="span4">-->
-                           Fahrtstrecke grün bis (km)
-                           <input id="modal_low" type="number" min="15" max="${ disHig - 1 }" value="${ disLow }" style="width:75px;">
-                         <!--</div>
-                         <div class="span4">-->
-                         <br>
-                           Fahrtstrecke rot ab (km)
-                           <input id="modal_hig" type="number" min="${ disLow + 1 }" value="${ disHig }" style="width:75px;">
-                         <!--</div>-->
+                         Fahrtstrecke rot ab (km)
+                         <input id="modal_hig" type="number" min="${ disLow + 1 }" value="${ disHig }" style="width:75px;background-color:${ colors.red }">
                        </div>
                        <div class="modal-footer">
                          <button type="button" class="btn btn-primary" id="modal_save">Speichern</button>
@@ -103,14 +106,14 @@
                  </div>`);
 
     async function saveSettings () {
-        const newPlaces = $("#modal_stay").val().trim() ? $("#modal_stay").val().split(",").map(a => a.trim()).sort((a, b) => a > b ? 1 : -1) : [],
-            newLow = +$("#modal_low").val(),
-            newHig = +$("#modal_hig").val();
+        const newPlaces = document.getElementById('modal_stay').value.trim() ? document.getElementById('modal_stay').value.split(",").map(a => a.trim()).sort((a, b) => a > b ? 1 : -1) : [];
 
         localStorage.textmarker = JSON.stringify({
             places: newPlaces,
-            disLow: newLow,
-            disHig: newHig
+            disLow: +document.getElementById('modal_low').value,
+            disHig: +document.getElementById('modal_hig').value,
+            use_distance: document.getElementById('modal_use_distance').checked,
+            distance: +document.getElementById('modal_distance').value
         });
 
         await alert("Erfolgreich gespeichert!");
@@ -125,7 +128,8 @@
         const newPlaces = add ? places : places.filter(a => a !== location);
         newPlaces.sort((a, b) => a > b ? 1 : -1);
 
-        localStorage.placedata = JSON.stringify(newPlaces);
+        settings.places = newPlaces;
+        localStorage.textmarker = JSON.stringify(settings);
 
         await alert(`Ort  ${ add ? "hinzugefügt" : "entfernt" }`);
 
@@ -146,9 +150,17 @@
         }
     }
 
-    function markDistance (deliver, fax = false) {
-        if (places.length > 0 && !places.includes(deliver)) {
-            $("select").val("2");
+    function markDistance (deliver, distance, fax = false) {
+        if (document.getElementsByName("return").length > 0) {
+            if (settings.use_distance) {
+                if (settings.distance < distance) {
+                    document.getElementsByName("return")[0].value = "2";
+                }
+            } else {
+                if (places.length > 0 && !places.includes(deliver)) {
+                    document.getElementsByName("return")[0].value = "2";
+                }
+            }
         }
 
         $(`td:contains(' km')`).each((k, i) => {
@@ -236,12 +248,14 @@
                 delDateElem.css("background-color", colors.lime);
             }
 
-            if (places.includes(deliver)) {
-                $(i).css("background-color", colors.lime);
-                $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/adr.png" width="16" height="16" title="Bei Lieferung an diesem Ort zurückfahren" class="place-remove" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
-            } else {
-                $(i).css("background-color", colors.orange);
-                $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/tag_red.png" width="16" height="16" title="Bei Lieferung an diesem Ort stehenbleiben" class="place-add" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
+            if (!settings.use_distance) {
+                if (places.includes(deliver)) {
+                    $(i).css("background-color", colors.lime);
+                    $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/adr.png" width="16" height="16" title="Bei Lieferung an diesem Ort zurückfahren" class="place-remove" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
+                } else {
+                    $(i).css("background-color", colors.orange);
+                    $(i).prepend(`<img src="https://www.lkw-sim.com/pics/icons/tag_red.png" width="16" height="16" title="Bei Lieferung an diesem Ort stehenbleiben" class="place-add" location="${ deliver }" style="cursor:pointer;padding-right:0.2em;">`);
+                }
             }
         });
     }
@@ -260,7 +274,8 @@
     }
 
 
-    let deliver = null;
+    let deliver = null,
+        distance = 0;
 
     if (path === "/firma:disponent:fax-auftraege") {
         $("span[style='color:red']").parent().parent().parent().css("display", "none");
@@ -274,12 +289,19 @@
 
         deliver = matchedExp.groups.destination.trim();
 
-        markDistance(deliver, true);
+        markDistance(deliver, +matchedExp.groups.distance.replace(/\D+/g, ""), true);
 
     } else if (path === "/firma:disponent:auftrag" || path === "/firma:disponent:auftrag2" || path === "/firma:disponent:auftrag3") {
-        deliver = $("strong:contains('Lieferort')")?.[0]?.nextSibling?.textContent?.trim();
+        const strongElements = document.getElementsByTagName("strong");
 
-        markDistance(deliver);
+        for (const strong of strongElements) {
+            const { textContent } = strong;
+
+            if (textContent === "Lieferort:") deliver = strong.nextSibling.textContent.trim();
+            if (textContent === "Entfernung:") distance = +strong.nextSibling.textContent.replace(/\D+/g, "");
+        }
+
+        markDistance(deliver, distance);
 
         $("td:contains(0 FE)").each((k, i) => {
             if (i.textContent === "0 FE") $(i).parent().css("display", "none");
