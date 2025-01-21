@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Vehicle Rename
-// @version      1.0.2
+// @version      1.1.0
 // @description  Fahrzeuge in der Gesamtübersicht umbenennen
 // @author       DrTraxx
-// @match        https://*.lkw-sim.com/firma:disponent:fuhrpark*
+// @match        *://*.lkw-sim.com/firma:disponent:fuhrpark*
+// @match        *://lkw-sim.com/firma:disponent:fuhrpark*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lkw-sim.com
 // @grant        none
 // ==/UserScript==
@@ -61,7 +62,10 @@
                 if (renamedVehicle !== oldName) {
                     console.log("vehicle renaming =>", renamedVehicle);
                     await $.post(renameHref, { "method": "rename_car", "carname": renamedVehicle })
-                        .done(() => $("#rename_list").text(`Gruppe ${ k + 1 }, Fahrzeug ${ ik + 1 } => ${ oldName } => ${ renamedVehicle }`));
+                        .done(() => {
+                            $("#rename_list").text(`Gruppe ${ k + 1 }, Fahrzeug ${ ik + 1 } => ${ oldName } => ${ renamedVehicle }`);
+                            children[0].innerHTML = children[0].innerHTML.replace(oldName, " " + renamedVehicle);
+                        });
                 }
             });
         });
