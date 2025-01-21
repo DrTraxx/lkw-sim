@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.5.0
+// @version      2.5.1
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        *://www.lkw-sim.com/firma:disponent*
@@ -153,7 +153,7 @@
     function markDistance (deliver, distance, fax = false) {
         if (document.getElementsByName("return").length > 0) {
             if (settings.use_distance) {
-                if (settings.distance < distance) {
+                if (distance >= settings.distance) {
                     document.getElementsByName("return")[0].value = "2";
                 }
             } else {
