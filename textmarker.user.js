@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Textmarker
-// @version      2.5.1
+// @version      2.6.0
 // @description  Markiert Anfahrten über 15 Kilometer, ändert die Rückfahreinstellungen, blendet in der Faxansicht zu spät kommende Fahrzeuge aus und in der Übersicht werden die Standorte mit 0 FE ausgeblendet
 // @author       DrTraxx
 // @match        *://www.lkw-sim.com/firma:disponent*
@@ -45,6 +45,7 @@
     }
 
     const settings = localStorage.textmarker ? JSON.parse(localStorage.textmarker) : { places: [], disLow: 50, disHig: 200, use_distance: false, distance: 500 },
+        missionDistance = sessionStorage.missiondistance ? JSON.parse(sessionStorage.missiondistance) : {},
         { places, disLow, disHig } = settings,
         path = window.location.pathname,
         colors = { lime: "limegreen", orange: "orange", red: "#F62817" },
@@ -58,6 +59,7 @@
 
 
     let lateVehicles = false,
+        missionID = 0,
         onTimeFe = 0,
         delayedFe = 0;
 
@@ -161,6 +163,11 @@
                     document.getElementsByName("return")[0].value = "2";
                 }
             }
+        }
+
+        // Wenn Fracht an Stadt mit Niederlassung geht immer am Standort bleiben
+        if (branches.includes(deliver)) {
+            document.getElementsByName("return")[0].value = "1";
         }
 
         $(`td:contains(' km')`).each((k, i) => {
@@ -275,16 +282,18 @@
 
 
     let deliver = null,
-        distance = 0;
+        distance = 0,
+        regExp = null;
 
     if (path === "/firma:disponent:fax-auftraege") {
+        regExp = /(?<start>[\w\W]+)\W\—\W(?<destination>.+)\((?<distance>[\d\w\s]+)\)/g
+
         $("span[style='color:red']").parent().parent().parent().css("display", "none");
 
         $("h2:contains(Anschlussaufträge)")
             .after(`<div class="btn-group" id="fax_btn_grp"><a class="btn btn-danger" id="toggle_lates">Verspätungen einblenden</></div>`);
 
         const way = $("strong:contains('Strecke:')")?.[0]?.nextSibling?.textContent,
-            regExp = /(?<start>[\w\W]+)\W\—\W(?<destination>.+)\((?<distance>[\d\w\s]+)\)/g,
             matchedExp = regExp.exec(way);
 
         deliver = matchedExp.groups.destination.trim();
@@ -292,6 +301,9 @@
         markDistance(deliver, +matchedExp.groups.distance.replace(/\D+/g, ""), true);
 
     } else if (path === "/firma:disponent:auftrag" || path === "/firma:disponent:auftrag2" || path === "/firma:disponent:auftrag3") {
+        regExp = /id\=(?<id>\d+)/g;
+        missionID = +regExp.exec(window.location.href).groups.id;
+
         const strongElements = document.getElementsByTagName("strong");
 
         for (const strong of strongElements) {
@@ -299,9 +311,23 @@
 
             if (textContent === "Lieferort:") deliver = strong.nextSibling.textContent.trim();
             if (textContent === "Entfernung:") distance = +strong.nextSibling.textContent.replace(/\D+/g, "");
+            if (textContent === "Strecke") missionDistance[missionID] = +strong.parentNode.nextSibling.nextSibling.textContent.replace(/\D+/g, "");
         }
 
-        markDistance(deliver, distance);
+        if (path === "/firma:disponent:auftrag3") {
+            sessionStorage.missiondistance = JSON.stringify(missionDistance);
+        }
+
+        markDistance(deliver, missionDistance?.[missionID] || distance);
+
+        if (path === "/firma:disponent:auftrag2" && missionDistance?.[missionID]) {
+            const insElem = document.createElement("h4"),
+                refElem = document.getElementsByClassName("disponent")[0];
+
+            insElem.innerHTML = `Frachtstrecke: ${ missionDistance[missionID].toLocaleString() } km`;
+
+            refElem.parentNode.insertBefore(insElem, refElem);
+        }
 
         $("td:contains(0 FE)").each((k, i) => {
             if (i.textContent === "0 FE") $(i).parent().css("display", "none");
