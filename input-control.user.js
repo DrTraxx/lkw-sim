@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Input-Control
-// @version      1.0.3
+// @version      1.1.0
 // @description  Fahrer und Zugmaschinen mit Anhänger auswählen
 // @author       DrTraxx
 // @match        https://*.lkw-sim.com/firma:disponent:auftrag2*
@@ -40,15 +40,45 @@
         }
     });
 
+    for (const strong of document.getElementsByTagName("strong")) {
+        if (strong.innerHTML === "Spätester Liefertermin:") {
+            const select = document.createElement("select"),
+                oneDriver = document.createElement("option"),
+                twoDriver = document.createElement("option"),
+                driveFactor = +localStorage.drivefactor || 1,
+                factorOne = driveFactor === 1;
+
+            oneDriver.text = "1 Fahrer pro Fahrzeug";
+            oneDriver.value = 1;
+
+            twoDriver.text = "2 Fahrer pro Fahrzeug";
+            twoDriver.value = 2;
+
+            if (factorOne === true) oneDriver.selected = true;
+            else twoDriver.selected = true;
+
+            select.id = "driverfactor";
+            select.add(oneDriver);
+            select.add(twoDriver);
+            select.addEventListener("change", (e) => { localStorage.drivefactor = +e.target.value; });
+
+            strong.parentNode.nextElementSibling.insertBefore(select, null);
+        }
+    }
+
     function checkDriver () {
+        const drivefactor = +localStorage.drivefactor || 1;
+
         let sumDrivers = 0;
+
         for (const i in iptTypes) {
             const { text, type, id } = iptTypes[i];
             if (type === "lkw") {
                 sumDrivers += +$(`#${ id }`).val();
             }
         }
-        $(`#${ driverID }`).val(sumDrivers).trigger("change");
+
+        $(`#${ driverID }`).val(sumDrivers * drivefactor).trigger("change");
     }
 
     // $("input[type='number']:not(input[watched_by_script='true'])").attr("disabled", "disabled");
